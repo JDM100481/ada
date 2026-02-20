@@ -1,2 +1,8 @@
-/realtimesst.log
-/.env
+node_modules
+.next
+.env*
+uploads/*
+!.gitkeep
+*.db
+*.sqlite
+npm-debug.log*
