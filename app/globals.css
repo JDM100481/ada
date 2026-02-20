@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900;
+}
+
+.app-shell {
+  @apply mx-auto min-h-screen max-w-[420px] bg-white shadow-sm;
+}
