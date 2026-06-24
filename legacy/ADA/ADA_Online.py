@@ -15,6 +15,7 @@ import python_weather
 import googlemaps # Added for travel duration
 from datetime import datetime # Added for travel duration
 from dotenv import load_dotenv # Added for API key loading
+from typing import Optional
 from .WIDGETS import jdm_os
 
 # --- Load Environment Variables ---
@@ -98,7 +99,7 @@ class ADA:
                 type=types.Type.OBJECT, properties={
                     "note_path": types.Schema(type=types.Type.STRING, description="The path of the note relative to the JDM-OS directory (e.g., '02_Daily_Execution/Meetings/meeting_notes.md')."),
                     "content": types.Schema(type=types.Type.STRING, description="The content to write or append to the note."),
-                    "mode": types.Schema(type=types.Type.STRING, description="Optional: Write mode. Either 'overwrite' to replace the content or 'append' to add to the end of the note. Defaults to 'overwrite'.")
+                    "mode": types.Schema(type=types.Type.STRING, description="Optional: Write mode. Either 'overwrite' to replace the content or 'append' to add to the end of the note. Defaults to 'append'.")
                 }, required=["note_path", "content"]
             )
         )
@@ -111,9 +112,13 @@ class ADA:
         )
         self.jdm_os_search_notes_func = types.FunctionDeclaration(
             name="jdm_os_search_notes",
-            description="Searches all markdown notes in JDM-OS recursively for a text query (matches in filenames or file contents).",
+            description="Searches markdown notes in JDM-OS recursively for a text query.",
             parameters=types.Schema(
-                type=types.Type.OBJECT, properties={"query": types.Schema(type=types.Type.STRING, description="The text query to search for.")}, required=["query"]
+                type=types.Type.OBJECT, properties={
+                    "query": types.Schema(type=types.Type.STRING, description="The text query to search for."),
+                    "directory": types.Schema(type=types.Type.STRING, description="Optional: Subdirectory relative to vault root to narrow the search."),
+                    "max_results": types.Schema(type=types.Type.INTEGER, description="Optional: Maximum number of search results to return. Defaults to 20.")
+                }, required=["query"]
             )
         )
         self.jdm_os_git_status_func = types.FunctionDeclaration(
@@ -121,6 +126,48 @@ class ADA:
             description="Checks the current git status (e.g. modified, untracked files) of the JDM-OS repository.",
             parameters=types.Schema(
                 type=types.Type.OBJECT, properties={}, required=[]
+            )
+        )
+        self.jdm_os_daily_brief_func = types.FunctionDeclaration(
+            name="jdm_os_daily_brief",
+            description="Generates a daily briefing summarizing current priorities, tasks, open loops, and repository status from JDM-OS.",
+            parameters=types.Schema(type=types.Type.OBJECT, properties={}, required=[])
+        )
+        self.jdm_os_add_task_func = types.FunctionDeclaration(
+            name="jdm_os_add_task",
+            description="Adds a new task as a markdown checklist item in JDM-OS.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "task": types.Schema(type=types.Type.STRING, description="The task description."),
+                    "target_file": types.Schema(type=types.Type.STRING, description="Optional: Specific file relative to vault. Defaults to '01_Command_Center/Tasks.md'.")
+                },
+                required=["task"]
+            )
+        )
+        self.jdm_os_log_decision_func = types.FunctionDeclaration(
+            name="jdm_os_log_decision",
+            description="Logs a decision in JDM-OS.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "decision": types.Schema(type=types.Type.STRING, description="The decision description."),
+                    "context": types.Schema(type=types.Type.STRING, description="Optional: Context or reasoning for the decision.")
+                },
+                required=["decision"]
+            )
+        )
+        self.jdm_os_bridge_log_func = types.FunctionDeclaration(
+            name="jdm_os_bridge_log",
+            description="Appends a log entry to the Ada Bridge Log in JDM-OS.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "action": types.Schema(type=types.Type.STRING, description="The action/operation performed."),
+                    "target": types.Schema(type=types.Type.STRING, description="The target file or path."),
+                    "summary": types.Schema(type=types.Type.STRING, description="A brief summary of the action.")
+                },
+                required=["action"]
             )
         )
         # --- End Function Declarations ---
@@ -133,7 +180,11 @@ class ADA:
             "jdm_os_write_note": self.jdm_os_write_note,
             "jdm_os_list_notes": self.jdm_os_list_notes,
             "jdm_os_search_notes": self.jdm_os_search_notes,
-            "jdm_os_git_status": self.jdm_os_git_status
+            "jdm_os_git_status": self.jdm_os_git_status,
+            "jdm_os_daily_brief": self.jdm_os_daily_brief,
+            "jdm_os_add_task": self.jdm_os_add_task,
+            "jdm_os_log_decision": self.jdm_os_log_decision,
+            "jdm_os_bridge_log": self.jdm_os_bridge_log
         }
 
         # --- Google Search Tool (Grounding) ---
@@ -155,7 +206,11 @@ class ADA:
                 self.jdm_os_write_note_func,
                 self.jdm_os_list_notes_func,
                 self.jdm_os_search_notes_func,
-                self.jdm_os_git_status_func
+                self.jdm_os_git_status_func,
+                self.jdm_os_daily_brief_func,
+                self.jdm_os_add_task_func,
+                self.jdm_os_log_decision_func,
+                self.jdm_os_bridge_log_func
                 ])]
         )
         # --- End Configuration ---
@@ -269,46 +324,73 @@ class ADA:
         """Reads a note from JDM-OS."""
         print(f"JDM-OS Bridge: Reading note '{note_path}'")
         try:
-            result = await asyncio.to_thread(jdm_os.read_note, note_path)
-            return {"content": result}
+            return await asyncio.to_thread(jdm_os.read_note, note_path)
         except Exception as e:
-            return {"error": f"Failed to read note: {str(e)}"}
+            return {"ok": False, "operation": "read_note", "path": note_path, "error": str(e)}
 
-    async def jdm_os_write_note(self, note_path: str, content: str, mode: str = "overwrite") -> dict:
+    async def jdm_os_write_note(self, note_path: str, content: str, mode: str = "append") -> dict:
         """Writes or appends to a note in JDM-OS."""
         print(f"JDM-OS Bridge: Writing note '{note_path}' (mode: {mode})")
         try:
-            result = await asyncio.to_thread(jdm_os.write_note, note_path, content, mode)
-            return {"result": result}
+            return await asyncio.to_thread(jdm_os.write_note, note_path, content, mode)
         except Exception as e:
-            return {"error": f"Failed to write note: {str(e)}"}
+            return {"ok": False, "operation": "write_note", "path": note_path, "error": str(e)}
 
-    async def jdm_os_list_notes(self, directory: str = "") -> dict:
+    async def jdm_os_list_notes(self, directory: str = ".") -> dict:
         """Lists notes in a directory in JDM-OS."""
         print(f"JDM-OS Bridge: Listing directory '{directory}'")
         try:
-            result = await asyncio.to_thread(jdm_os.list_notes, directory)
-            return {"result": result}
+            return await asyncio.to_thread(jdm_os.list_notes, directory)
         except Exception as e:
-            return {"error": f"Failed to list notes: {str(e)}"}
+            return {"ok": False, "operation": "list_notes", "path": directory, "error": str(e)}
 
-    async def jdm_os_search_notes(self, query: str) -> dict:
+    async def jdm_os_search_notes(self, query: str, directory: str = ".", max_results: int = 20) -> dict:
         """Searches notes in JDM-OS."""
-        print(f"JDM-OS Bridge: Searching for '{query}'")
+        print(f"JDM-OS Bridge: Searching for '{query}' in '{directory}' (max: {max_results})")
         try:
-            result = await asyncio.to_thread(jdm_os.search_notes, query)
-            return {"result": result}
+            return await asyncio.to_thread(jdm_os.search_notes, query, directory, max_results)
         except Exception as e:
-            return {"error": f"Failed to search notes: {str(e)}"}
+            return {"ok": False, "operation": "search_notes", "path": directory, "error": str(e)}
 
     async def jdm_os_git_status(self) -> dict:
         """Gets the git status of JDM-OS repository."""
         print("JDM-OS Bridge: Checking git status")
         try:
-            result = await asyncio.to_thread(jdm_os.git_status)
-            return {"result": result}
+            return await asyncio.to_thread(jdm_os.git_status)
         except Exception as e:
-            return {"error": f"Failed to check git status: {str(e)}"}
+            return {"ok": False, "operation": "git_status", "path": ".", "error": str(e)}
+
+    async def jdm_os_daily_brief(self) -> dict:
+        """Generates a daily brief from JDM-OS."""
+        print("JDM-OS Bridge: Generating daily brief")
+        try:
+            return await asyncio.to_thread(jdm_os.daily_brief)
+        except Exception as e:
+            return {"ok": False, "operation": "daily_brief", "path": ".", "error": str(e)}
+
+    async def jdm_os_add_task(self, task: str, target_file: Optional[str] = None) -> dict:
+        """Adds a task to JDM-OS."""
+        print(f"JDM-OS Bridge: Adding task '{task}'")
+        try:
+            return await asyncio.to_thread(jdm_os.add_task, task, target_file)
+        except Exception as e:
+            return {"ok": False, "operation": "add_task", "path": target_file or "", "error": str(e)}
+
+    async def jdm_os_log_decision(self, decision: str, context: str = "") -> dict:
+        """Logs a decision to JDM-OS."""
+        print(f"JDM-OS Bridge: Logging decision '{decision}'")
+        try:
+            return await asyncio.to_thread(jdm_os.log_decision, decision, context)
+        except Exception as e:
+            return {"ok": False, "operation": "log_decision", "path": "", "error": str(e)}
+
+    async def jdm_os_bridge_log(self, action: str, target: str = "", summary: str = "") -> dict:
+        """Logs an action to the bridge log in JDM-OS."""
+        print(f"JDM-OS Bridge: Writing bridge log for '{action}'")
+        try:
+            return await asyncio.to_thread(jdm_os.bridge_log, action, target, summary)
+        except Exception as e:
+            return {"ok": False, "operation": "bridge_log", "path": "", "error": str(e)}
     # --- End JDM-OS Bridge Async Methods ---
 
     async def clear_queues(self, text=""):

@@ -68,20 +68,37 @@ class ADA:
                     folder_name (str): The name of the project folder to create.
                 """
 
-            def jdm_os.read_note(note_path: str) -> str:
+            def jdm_os.read_note(note_path: str) -> dict:
                 """Reads the content of a markdown note inside JDM-OS."""
 
-            def jdm_os.write_note(note_path: str, content: str, mode: str = "overwrite") -> str:
-                """Writes or appends content to a note in JDM-OS."""
+            def jdm_os.write_note(note_path: str, content: str, mode: str = "append") -> dict:
+                """Writes or appends content to a note in JDM-OS. Default mode is 'append'."""
 
-            def jdm_os.list_notes(directory: str = "") -> str:
+            def jdm_os.list_notes(directory: str = ".") -> dict:
                 """Lists files and subdirectories in a directory inside JDM-OS."""
 
-            def jdm_os.search_notes(query: str) -> str:
+            def jdm_os.search_notes(query: str, directory: str = ".", max_results: int = 20) -> dict:
                 """Searches all markdown notes in JDM-OS recursively for a text query."""
 
-            def jdm_os.git_status() -> str:
+            def jdm_os.git_status() -> dict:
                 """Checks the current git status of the JDM-OS repository."""
+
+            def jdm_os.daily_brief() -> dict:
+                """Generates a daily brief summarizing priorities, tasks, loops, and repo status."""
+
+            def jdm_os.add_task(task: str, target_file: str = None) -> dict:
+                """Adds a new task checkbox item to Tasks.md (or specified file)."""
+
+            def jdm_os.log_decision(decision: str, context: str = "") -> dict:
+                """Logs a decision to Decisions.md (or Decision_Log.md)."""
+
+            def jdm_os.bridge_log(action: str, target: str = "", summary: str = "") -> dict:
+                """Appends an entry to the Ada Bridge Log."""
+
+            Examples:
+            - User: Ada, brief me. -> call jdm_os.daily_brief()
+            - User: Ada, add this task: review Ada bridge tomorrow. -> call jdm_os.add_task("review Ada bridge tomorrow")
+            - User: Ada, log this decision: Ada is now the JDM-OS voice bridge. -> call jdm_os.log_decision("Ada is now the JDM-OS voice bridge")
         ```
 
         User: {user_message}
