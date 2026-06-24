@@ -1,2 +1,4 @@
 /realtimesst.log
 /.env
+__pycache__/
+*.pyc

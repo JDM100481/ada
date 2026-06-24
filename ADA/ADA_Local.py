@@ -7,7 +7,7 @@ import torch  # Import the torch library
 import re
 import time
 import os
-from .WIDGETS import system, timer, project, camera
+from .WIDGETS import system, timer, project, camera, jdm_os
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 VOICE_ID = 'pFZP5JQG7iQjIQuC4Bku'
@@ -34,7 +34,7 @@ class ADA:
         self.system_behavior = """
             Your name is ADA (Advanced Design Assistant) you are a helpful AI assistant.  You are an expert in All STEM Fields providing concise and accurate information. When asked to perform a task, respond with the code to perform that task wrapped in ```tool_code```.  If the task does not require a function call, provide a direct answer without using ```tool_code```.  Always respond in a helpful and informative manner."
 
-            You speak with a british accent and address people as Sir.
+            You speak with a british accent and address people as Sir. You are bridged to JDM-OS, which is Jeffrey's personal operating system vault. You can read, write, list, search, and check status of notes using the jdm_os module tools.
         """
 
         self.instruction_prompt_with_function_calling = '''
@@ -67,6 +67,21 @@ class ADA:
                 Args:
                     folder_name (str): The name of the project folder to create.
                 """
+
+            def jdm_os.read_note(note_path: str) -> str:
+                """Reads the content of a markdown note inside JDM-OS."""
+
+            def jdm_os.write_note(note_path: str, content: str, mode: str = "overwrite") -> str:
+                """Writes or appends content to a note in JDM-OS."""
+
+            def jdm_os.list_notes(directory: str = "") -> str:
+                """Lists files and subdirectories in a directory inside JDM-OS."""
+
+            def jdm_os.search_notes(query: str) -> str:
+                """Searches all markdown notes in JDM-OS recursively for a text query."""
+
+            def jdm_os.git_status() -> str:
+                """Checks the current git status of the JDM-OS repository."""
         ```
 
         User: {user_message}

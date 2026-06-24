@@ -15,6 +15,7 @@ import python_weather
 import googlemaps # Added for travel duration
 from datetime import datetime # Added for travel duration
 from dotenv import load_dotenv # Added for API key loading
+from .WIDGETS import jdm_os
 
 # --- Load Environment Variables ---
 load_dotenv()
@@ -59,6 +60,8 @@ class ADA:
             You address people as "Sir" and you also speak with a british accent.
             When answering, you respond using complete sentences and in a conversational tone. Make sure to keep tempo of answers quick so don't use too much commas, periods or overall punctuation.
             Any prompts that need current or recent data always use the search tool.
+
+            You are bridged to JDM-OS, which is the personal operating system / Obsidian vault of Jeffrey Del Mundo (JDM). You have access to tools to read, write, list, search, and check git status of notes in the JDM-OS vault. Use these tools whenever the user asks about tasks, notes, active projects, decisions, daily reports, or details in JDM-OS. Do not invent JDM-OS structure; query the vault if you do not know.
             """
         
         # --- Function Declarations (Added get_travel_duration_func) ---
@@ -80,12 +83,57 @@ class ADA:
                 }, required=["origin", "destination"]
             )
         )
+        # --- JDM-OS Bridge Function Declarations ---
+        self.jdm_os_read_note_func = types.FunctionDeclaration(
+            name="jdm_os_read_note",
+            description="Reads the content of a markdown note inside JDM-OS. The note path should be relative to the JDM-OS directory (e.g., '01_Command_Center/Today.md').",
+            parameters=types.Schema(
+                type=types.Type.OBJECT, properties={"note_path": types.Schema(type=types.Type.STRING, description="The path of the note relative to the JDM-OS directory.")}, required=["note_path"]
+            )
+        )
+        self.jdm_os_write_note_func = types.FunctionDeclaration(
+            name="jdm_os_write_note",
+            description="Writes or appends content to a note in JDM-OS. Creates folders and files if they do not exist.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT, properties={
+                    "note_path": types.Schema(type=types.Type.STRING, description="The path of the note relative to the JDM-OS directory (e.g., '02_Daily_Execution/Meetings/meeting_notes.md')."),
+                    "content": types.Schema(type=types.Type.STRING, description="The content to write or append to the note."),
+                    "mode": types.Schema(type=types.Type.STRING, description="Optional: Write mode. Either 'overwrite' to replace the content or 'append' to add to the end of the note. Defaults to 'overwrite'.")
+                }, required=["note_path", "content"]
+            )
+        )
+        self.jdm_os_list_notes_func = types.FunctionDeclaration(
+            name="jdm_os_list_notes",
+            description="Lists the files and subdirectories in a directory inside JDM-OS.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT, properties={"directory": types.Schema(type=types.Type.STRING, description="Optional: The subdirectory relative to JDM-OS to list. Use empty string for vault root.")}, required=[]
+            )
+        )
+        self.jdm_os_search_notes_func = types.FunctionDeclaration(
+            name="jdm_os_search_notes",
+            description="Searches all markdown notes in JDM-OS recursively for a text query (matches in filenames or file contents).",
+            parameters=types.Schema(
+                type=types.Type.OBJECT, properties={"query": types.Schema(type=types.Type.STRING, description="The text query to search for.")}, required=["query"]
+            )
+        )
+        self.jdm_os_git_status_func = types.FunctionDeclaration(
+            name="jdm_os_git_status",
+            description="Checks the current git status (e.g. modified, untracked files) of the JDM-OS repository.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT, properties={}, required=[]
+            )
+        )
         # --- End Function Declarations ---
 
         # --- Map function names to actual methods (Added get_travel_duration) ---
         self.available_functions = {
             "get_weather": self.get_weather,
-            "get_travel_duration": self.get_travel_duration # Added mapping
+            "get_travel_duration": self.get_travel_duration, # Added mapping
+            "jdm_os_read_note": self.jdm_os_read_note,
+            "jdm_os_write_note": self.jdm_os_write_note,
+            "jdm_os_list_notes": self.jdm_os_list_notes,
+            "jdm_os_search_notes": self.jdm_os_search_notes,
+            "jdm_os_git_status": self.jdm_os_git_status
         }
 
         # --- Google Search Tool (Grounding) ---
@@ -102,7 +150,12 @@ class ADA:
             # ---> Updated tools list <---
             tools=[self.google_search_tool, types.Tool(code_execution=types.ToolCodeExecution,function_declarations=[
                 self.get_weather_func,
-                self.get_travel_duration_func # Add the new function here
+                self.get_travel_duration_func, # Add the new function here
+                self.jdm_os_read_note_func,
+                self.jdm_os_write_note_func,
+                self.jdm_os_list_notes_func,
+                self.jdm_os_search_notes_func,
+                self.jdm_os_git_status_func
                 ])]
         )
         # --- End Configuration ---
@@ -211,6 +264,52 @@ class ADA:
             return {"duration_result": f"Failed to execute travel duration request: {e}"}
     # --- End Travel Duration Functions ---
 
+    # --- JDM-OS Bridge Async Methods ---
+    async def jdm_os_read_note(self, note_path: str) -> dict:
+        """Reads a note from JDM-OS."""
+        print(f"JDM-OS Bridge: Reading note '{note_path}'")
+        try:
+            result = await asyncio.to_thread(jdm_os.read_note, note_path)
+            return {"content": result}
+        except Exception as e:
+            return {"error": f"Failed to read note: {str(e)}"}
+
+    async def jdm_os_write_note(self, note_path: str, content: str, mode: str = "overwrite") -> dict:
+        """Writes or appends to a note in JDM-OS."""
+        print(f"JDM-OS Bridge: Writing note '{note_path}' (mode: {mode})")
+        try:
+            result = await asyncio.to_thread(jdm_os.write_note, note_path, content, mode)
+            return {"result": result}
+        except Exception as e:
+            return {"error": f"Failed to write note: {str(e)}"}
+
+    async def jdm_os_list_notes(self, directory: str = "") -> dict:
+        """Lists notes in a directory in JDM-OS."""
+        print(f"JDM-OS Bridge: Listing directory '{directory}'")
+        try:
+            result = await asyncio.to_thread(jdm_os.list_notes, directory)
+            return {"result": result}
+        except Exception as e:
+            return {"error": f"Failed to list notes: {str(e)}"}
+
+    async def jdm_os_search_notes(self, query: str) -> dict:
+        """Searches notes in JDM-OS."""
+        print(f"JDM-OS Bridge: Searching for '{query}'")
+        try:
+            result = await asyncio.to_thread(jdm_os.search_notes, query)
+            return {"result": result}
+        except Exception as e:
+            return {"error": f"Failed to search notes: {str(e)}"}
+
+    async def jdm_os_git_status(self) -> dict:
+        """Gets the git status of JDM-OS repository."""
+        print("JDM-OS Bridge: Checking git status")
+        try:
+            result = await asyncio.to_thread(jdm_os.git_status)
+            return {"result": result}
+        except Exception as e:
+            return {"error": f"Failed to check git status: {str(e)}"}
+    # --- End JDM-OS Bridge Async Methods ---
 
     async def clear_queues(self, text=""):
         """Clears all data from the input, response, and audio queues."""
