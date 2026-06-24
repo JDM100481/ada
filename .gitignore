@@ -1,4 +1,25 @@
-/realtimesst.log
+# Environment / secrets
 /.env
+.env
+.env.*
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Runtime logs
+/realtimesst.log
+*.log
+
+# Virtual environments
+.venv/
+venv/
+mygene312/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
