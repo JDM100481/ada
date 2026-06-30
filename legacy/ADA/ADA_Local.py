@@ -114,7 +114,7 @@ class ADA:
         self.response_queue = asyncio.Queue()
         self.audio_queue = asyncio.Queue()
         self.recorder_config = {
-            'model': 'large-v3',
+            'model': 'base',
             'spinner': False,
             'language': 'en',
             'silero_sensitivity': 0.01,
