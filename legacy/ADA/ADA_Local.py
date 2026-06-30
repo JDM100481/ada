@@ -257,7 +257,8 @@ class ADA:
                 time_to_first_audio = self.first_audio_byte_time - self.prompt_start_time
                 print(f"Time from prompt to first audio byte: {time_to_first_audio:.4f} seconds")
             self.stream.feed(chunk)
-            self.stream.play_async()
+            if not self.stream.is_playing():
+                self.stream.play_async()
 
     async def stt(self):
         if self.recorder is None:

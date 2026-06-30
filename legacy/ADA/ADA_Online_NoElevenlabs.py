@@ -523,7 +523,8 @@ class ADA:
                     # Feed the text chunk to the TTS stream
                     self.stream.feed(chunk)
                     # Start/continue asynchronous playback of buffered audio
-                    self.stream.play_async()
+                    if not self.stream.is_playing():
+                        self.stream.play_async()
 
                 self.response_queue.task_done()
 
