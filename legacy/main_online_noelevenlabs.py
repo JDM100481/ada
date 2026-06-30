@@ -7,6 +7,11 @@ Before running this script, ensure the `GOOGLE_API_KEY` environment
 variable is set to the api-key you obtained from Google AI Studio.
 '''
 
+import logging
+# Suppress debug poll spam from RealtimeSTT
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("RealtimeSTT").setLevel(logging.WARNING)
+
 from ADA.ADA_Online_NoElevenlabs import ADA
 import asyncio
 

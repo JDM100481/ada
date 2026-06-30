@@ -4,6 +4,11 @@ input and output, which often won't include echo cancellation. So to prevent
 the model from interrupting itself it is important that you use headphones. 
 '''
 
+import logging
+# Suppress debug poll spam from RealtimeSTT
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("RealtimeSTT").setLevel(logging.WARNING)
+
 from ADA.ADA_Local import ADA
 import asyncio
 
